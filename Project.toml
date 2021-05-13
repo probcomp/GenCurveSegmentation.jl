@@ -10,6 +10,7 @@ GenParticleFilters = "56b76ac4-72ef-411e-b419-6d312ed86a6f"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 
 [compat]
+Distributions = "0.25"
 julia = "1"
 
 [extras]
