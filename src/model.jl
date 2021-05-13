@@ -15,8 +15,8 @@ generate_points(start, speed, dir, n) =
     disconnect ~ bernoulli(0.1)
     if disconnect
         stroke ~ categorical(type_prior)
-        start_x ~ uniform(1.25, 3.75)
-        start_y ~ uniform(1.25, 3.75)
+        start_x ~ uniform(0.0, 5.0)
+        start_y ~ uniform(0.0, 5.0)
         start = [start_x, start_y]
     else
         stroke ~ categorical(type_transition[prev_stroke,:])
@@ -36,8 +36,8 @@ end
 
 @gen (static) function curve_model(T::Int)
     n_strokes ~ poisson(10)
-    init_x ~ uniform(1.25, 3.75)
-    init_y ~ uniform(1.25, 3.75)
+    init_x ~ uniform(0.0, 5.0)
+    init_y ~ uniform(0.0, 5.0)
     states = {:strokes} ~ Unfold(stroke_step)(n_strokes, (5, [init_x, init_y]))
     points_per_stroke ~ Map(get_points)(states)
     points = reduce(vcat, points_per_stroke)

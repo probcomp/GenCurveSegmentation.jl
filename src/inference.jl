@@ -2,8 +2,8 @@
 
 @gen function init_proposal(obs)
     n_strokes ~ shifted_poisson(0.25, 1)
-    init_x ~ trunc_normal(obs[1], 0.05, 1.25, 3.75)
-    init_y ~ trunc_normal(obs[2], 0.05, 1.25, 3.75)
+    init_x ~ trunc_normal(obs[1], 0.05, 0.0, 5.0)
+    init_y ~ trunc_normal(obs[2], 0.05, 0.0, 5.0)
 end
 
 ## SMC update kernels ##
@@ -13,12 +13,12 @@ end
     n_strokes ~ shifted_poisson(0.25, trace[:n_strokes]+1)
     # Disconnect stroke if new observation is far from previous one
     prev_obs = trace[:obs][t-1]
-    p_disconnect = 1 - exp(-sum(((obs .- prev_obs)./1.0).^2))
+    p_disconnect = 1 - exp(-sum(((obs .- prev_obs)./1.5).^2))
     disconnect ~ bernoulli(p_disconnect)
     # Sample new stroke location based on observation
     if disconnect
-        start_x ~ trunc_normal(obs[1], 0.05, 1.25, 3.75)
-        start_y ~ trunc_normal(obs[2], 0.05, 1.25, 3.75)
+        start_x ~ trunc_normal(obs[1], 0.05, 0.0, 5.0)
+        start_y ~ trunc_normal(obs[2], 0.05, 0.0, 5.0)
     end
 end
 
@@ -60,15 +60,18 @@ end
     speed ~ gamma(2.0, 0.05)
     # Disconnect stroke if new observation is far from previous one
     prev_obs = trace[:obs][t-1]
-    p_disconnect = 1 - exp(-sum(((obs .- prev_obs)./1.0).^2))
+    p_disconnect = 1 - exp(-sum(((obs .- prev_obs)./1.5).^2))
     disconnect ~ bernoulli(p_disconnect)
     # Sample new stroke location based on observation
     if disconnect
         stroke ~ categorical(type_prior)
-        start_x ~ trunc_normal(obs[1], 0.05, 1.25, 3.75)
-        start_y ~ trunc_normal(obs[2], 0.05, 1.25, 3.75)
+        start_x ~ trunc_normal(obs[1], 0.05, 0.0, 5.0)
+        start_y ~ trunc_normal(obs[2], 0.05, 0.0, 5.0)
     else
-        stroke ~ categorical(type_transition[prev_stroke,:])
+        est_dir = argmax(directions * (obs - prev_obs))
+        dir_probs = ones(4) * 0.05
+        dir_probs[est_dir] = 0.85
+        stroke ~ categorical(dir_probs)
     end
     return (i_stroke, offset)
 end
@@ -132,7 +135,7 @@ end
     i_stroke, offset = t > n_points ? (nothing, nothing) : segment_find(t, stroke_lengths)
     # Guess if new observation is part of the same stroke as previous one
     prev_obs = t == 1 ? obs : trace[:obs][t-1]
-    p_connected = exp(-sum(((obs .- prev_obs)./1.0).^2))
+    p_connected = exp(-sum(((obs .- prev_obs)./1.5).^2))
     # Decide between sub-proposals
     if t > n_points # Extend with new stroke or points
         p_new_stroke, p_new_points = 1-p_connected, p_connected
@@ -168,7 +171,7 @@ end
     n_points = sum(stroke_lengths)
     i_stroke, offset = t > n_points ? (nothing, nothing) : segment_find(t, stroke_lengths)
     # Sample a branch and call sub-proposal
-    branch ~ categorical([0.1, 0.1, 0.1, 0.1, 0.6])
+    branch ~ categorical([0.1, 0.1, 0.05, 0.05, 0.7])
     if branch == 1 # Reverse stroke extension
         {*} ~ bwd_stroke_proposal(trace, t, obs)
     elseif branch == 2 # Reverse points extension
@@ -252,12 +255,12 @@ end
     if i_stroke == 1 || T <= points_before_stroke return end
     new_start = trace[:obs][points_before_stroke + 1]
     prev_stop = trace[:obs][points_before_stroke]
-    p_disconnect = 1 - exp(-sum(((new_start .- prev_stop)./1.0).^2))
+    p_disconnect = 1 - exp(-sum(((new_start .- prev_stop)./1.5).^2))
     disconnect = {:strokes => i_stroke => :disconnect} ~ bernoulli(p_disconnect)
     # Sample new stroke location based on observation
     if disconnect
-        {:strokes => i_stroke => :start_x} ~ trunc_normal(obs[1], 0.05, 1.25, 3.75)
-        {:strokes => i_stroke => :start_y} ~ trunc_normal(obs[2], 0.05, 1.25, 3.75)
+        {:strokes => i_stroke => :start_x} ~ trunc_normal(obs[1], 0.05, 0.0, 5.0)
+        {:strokes => i_stroke => :start_y} ~ trunc_normal(obs[2], 0.05, 0.0, 5.0)
     end
 end
 
@@ -265,9 +268,9 @@ end
     i_stroke = trace[:n_strokes] - t_prev
     if i_stroke > 0 && trace[:strokes => i_stroke => :disconnect]
         {:strokes => i_stroke => :start_x} ~
-            trunc_normal(trace[:strokes => i_stroke => :start_x], 0.1, 1.25, 3.75)
+            trunc_normal(trace[:strokes => i_stroke => :start_x], 0.1, 0.0, 5.0)
         {:strokes => i_stroke => :start_y} ~
-            trunc_normal(trace[:strokes => i_stroke => :start_y], 0.1, 1.25, 3.75)
+            trunc_normal(trace[:strokes => i_stroke => :start_y], 0.1, 0.0, 5.0)
     end
 end
 
@@ -275,11 +278,14 @@ end
 
 function particle_filter(observations, n_particles, ess_thresh=0.5;
                          show_plot::Bool=true, anim=nothing)
+    # Concatenate observations to 2D array if necessary
+    if observations isa AbstractArray && observations[1] isa AbstractVector
+         observations = reduce(hcat, observations) end
     # Initialize particle filter with first observation
-    n_obs = length(observations)
-    obs_choices = [choicemap((:obs => t => :pt, observations[t])) for t=1:n_obs]
+    n_obs = size(observations)[2]
+    obs_choices = [choicemap((:obs => t => :pt, observations[:, t])) for t=1:n_obs]
     state = pf_initialize(curve_model, (0,), choicemap(),
-                          init_proposal, (observations[1],), n_particles)
+                          init_proposal, (observations[:, 1],), n_particles)
     # Iterate across timesteps
     for t=1:n_obs
         # Resample and rejuvenate if the effective sample size is too low
@@ -289,8 +295,8 @@ function particle_filter(observations, n_particles, ess_thresh=0.5;
             if 2 <= t <= 10 pf_rejuvenate!(state, mh, (rejuv_init, ())) end
             # pf_rejuvenate!(state, mh, (rejuv_connect, ()))
             for k in 0:2
-                pf_rejuvenate!(state, mh, (rejuv_smart, (k,)))
                 pf_rejuvenate!(state, mh, (rejuv_start, (k,)))
+                pf_rejuvenate!(state, mh, (rejuv_smart, (k,)))
             end
         end
         pf_rejuvenate!(state, mh, (rejuv_dir, ()), 2)
@@ -298,12 +304,12 @@ function particle_filter(observations, n_particles, ess_thresh=0.5;
         pf_rejuvenate!(state, mh, (rejuv_speed, (1,)))
         pf_rejuvenate!(state, mh, (rejuv_speed, (2,)))
         # Smart update that proposes new strokes or new points
-        obs = observations[t]
+        obs = observations[:, t]
         pf_update!(state, (t,), (UnknownChange(),), obs_choices[t],
                    fwd_proposal, (t, obs), bwd_proposal, (t, obs), update_transform)
         # Render trace
         traces, weights = get_traces(state), get_norm_weights(state)
-        plt = render_traces(traces, weights, observations[1:t])
+        plt = render_traces(traces, weights, observations[:,1:t])
         if show_plot display(plt) end
         if !isnothing(anim) frame(anim) end
     end

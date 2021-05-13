@@ -21,9 +21,14 @@ function render_trace!(trace::Trace, plt=nothing; show_obs=true, kwargs...)
     return plt
 end
 
+function render_obs(obs; kwargs...)
+    plt = plot(size=(500, 500), ratio=:equal, legend=false, xlims=[0, 5], ylims=[0, 5])
+    render_obs!(obs, plt; kwargs...)
+end
+
 function render_obs!(obs, plt=nothing; kwargs...)
     plt = isnothing(plt) ? plot!() : plt
-    obs = reduce(hcat, obs)
+    if obs isa AbstractArray && obs[1] isa AbstractVector obs = reduce(hcat, obs) end
     scatter!(obs[1, :], obs[2,:], color=:black, figsize=(500, 500),
              marker=:dot, msize=3, markerstrokewidth=0, kwargs...)
     return plt
