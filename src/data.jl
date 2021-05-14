@@ -1,14 +1,21 @@
+function parse_sequence(str::AbstractString)
+    sequence = split.(split(str, ";"), ",")
+    sequence = [uppercase(join(first.(s))) for s in sequence]
+    return join(sequence, "#")
+end
+
 function parse_strokes(str::AbstractString)
     lines = filter(x -> x[1] != '#', split(str))
-    data = map(x -> parse.(Float64, split(x, ",")), lines)
-    return reduce(hcat, data)
+    sequence = parse_sequence(lines[1])
+    data = map(x -> parse.(Float64, split(x, ",")), lines[2:end])
+    return sequence, reduce(hcat, data)
 end
 
 function load_strokes(fn::AbstractString; transform=false, jitter=false)
-    data = read(fn, String) |> parse_strokes
+    sequence, data = read(fn, String) |> parse_strokes
     transform && transform_strokes!(data)
     jitter && add_jitter!(data)
-    return data
+    return sequence, data
 end
 
 function transform_strokes!(data::AbstractMatrix;
@@ -33,8 +40,6 @@ end
 function load_dataset(dir::AbstractString; transform=true, jitter=false)
     fns = readdir(dir)
     fns = filter(s -> match(r".*\.txt", s) !== nothing, fns)
-    dataset = load_strokes.(joinpath.(dir, fns))
-    transform && transform_strokes!.(dataset)
-    jitter && add_jitter!.(dataset)
+    dataset = load_strokes.(joinpath.(dir, fns); transform=transform, jitter=jitter)
     return dataset
 end

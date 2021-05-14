@@ -46,3 +46,21 @@ function render_traces(traces::AbstractVector{<:Trace}, weights::AbstractVector{
     end
     return plt
 end
+
+function render_cb!(t::Int, state, observations;
+                    show_plot=true, anim=nothing,
+                    plt_buffer=nothing, plt_interval=0.2)
+    traces, weights = get_traces(state), get_norm_weights(state)
+    plt = render_traces(traces, weights, observations[:,1:t])
+    title!(plt, "t = $t")
+    if show_plot display(plt) end
+    if !isnothing(anim) frame(anim) end
+    if !isnothing(plt_buffer)
+        T = size(observations)[2]
+        plt_interval = plt_interval < 1 ?
+            floor(Int, plt_interval * T) : round(Int, plt_interval)
+        if mod(t, plt_interval) == 0 || t == T
+            push!(plt_buffer, plt)
+        end
+    end
+end

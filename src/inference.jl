@@ -277,7 +277,7 @@ end
 ## Top-level particle filter ##
 
 function particle_filter(observations, n_particles, ess_thresh=0.5;
-                         show_plot::Bool=true, anim=nothing)
+                         callback=render_cb!, callback_args...)
     # Concatenate observations to 2D array if necessary
     if observations isa AbstractArray && observations[1] isa AbstractVector
          observations = reduce(hcat, observations) end
@@ -307,11 +307,10 @@ function particle_filter(observations, n_particles, ess_thresh=0.5;
         obs = observations[:, t]
         pf_update!(state, (t,), (UnknownChange(),), obs_choices[t],
                    fwd_proposal, (t, obs), bwd_proposal, (t, obs), update_transform)
-        # Render trace
-        traces, weights = get_traces(state), get_norm_weights(state)
-        plt = render_traces(traces, weights, observations[:,1:t])
-        if show_plot display(plt) end
-        if !isnothing(anim) frame(anim) end
+        # Run callback
+        if !isnothing(callback)
+            callback(t, state, observations; callback_args...)
+        end
     end
     return state
 end

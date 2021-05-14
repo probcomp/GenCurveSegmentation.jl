@@ -4,11 +4,14 @@ authors = ["Xuan <tanqazx@gmail.com> and contributors"]
 version = "0.1.0"
 
 [deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Gen = "ea4f424c-a589-11e8-07c0-fd5c91b9da4a"
 GenParticleFilters = "56b76ac4-72ef-411e-b419-6d312ed86a6f"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+StringDistances = "88034a9c-02f8-509d-84a9-84ec65e18404"
 
 [compat]
 julia = "1"
